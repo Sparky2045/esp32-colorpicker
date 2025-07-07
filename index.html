@@ -93,12 +93,12 @@
       try {
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ name: "ESP32-RGB" }],
-          optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
+          optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"]
         });
 
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService("12345678-1234-1234-1234-1234567890ab");
-        characteristic = await service.getCharacteristic("abcdefab-1234-1234-1234-abcdefabcdef");
+        const service = await server.getPrimaryService("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+        characteristic = await service.getCharacteristic("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
 
         document.getElementById("connectButton").textContent = "✅ Verbunden";
         document.getElementById("connectButton").disabled = true;
