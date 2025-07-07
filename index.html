@@ -2,65 +2,74 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ESP32 RGB Steuerung</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ESP32 RGB Color Picker</title>
   <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
   <style>
     body {
       background-color: #111;
-      color: #fff;
+      color: white;
       font-family: Arial, sans-serif;
       text-align: center;
-      padding: 2rem;
+      padding: 20px;
     }
-
-    #colorWheel {
-      margin: 2rem auto;
+    #colorPicker {
+      margin: 20px auto;
     }
-
-    #brightnessLabel {
-      margin-top: 2rem;
+    #preview {
+      width: 120px;
+      height: 120px;
+      margin: 20px auto;
+      border-radius: 50%;
+      border: 2px solid #444;
     }
-
-    input[type="range"] {
+    #brightnessInput {
       width: 200px;
     }
-
-    #preview {
-      width: 150px;
-      height: 150px;
-      margin: 2rem auto;
-      border-radius: 50%;
-      border: 2px solid #555;
+    button {
+      background-color: #333;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #555;
+    }
+    #connectionStatus {
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
   <h1>ESP32 RGB Color Picker</h1>
-
-  <div id="colorWheel"></div>
-
-  <div id="brightnessLabel">Helligkeit:</div>
-  <input type="range" id="brightness" min="0" max="255" value="255" />
-
+  <div id="colorPicker"></div>
+  <label for="brightnessInput">Helligkeit:</label><br>
+  <input type="range" id="brightnessInput" min="0" max="255" value="255" /><br>
   <div id="preview"></div>
 
+  <button id="connectButton">Mit ESP32 verbinden</button>
+  <div id="connectionStatus">❌ Nicht verbunden</div>
+
   <script>
-    const colorWheel = new iro.ColorPicker("#colorWheel", {
-      width: 250,
+    const colorWheel = new iro.ColorPicker("#colorPicker", {
+      width: 280,
       color: "#ff0000",
       borderWidth: 1,
-      borderColor: "#333",
+      borderColor: "#555"
     });
 
-    const brightnessInput = document.getElementById("brightness");
     const preview = document.getElementById("preview");
+    const brightnessInput = document.getElementById("brightnessInput");
+    let bleCharacteristic = null;
 
     function scale(value, brightness) {
       return Math.round((value / 255) * brightness);
     }
 
-    function updatePreview(color) {
+    function updatePreviewAndSend(color) {
       const brightness = brightnessInput.value;
       const rgb = color.rgb;
 
@@ -69,17 +78,35 @@
       const b = scale(rgb.b, brightness);
 
       preview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+      sendToESP(r, g, b);
     }
 
-    // Initial Update
-    updatePreview(colorWheel.color);
+    function sendToESP(r, g, b) {
+      if (!bleCharacteristic) return;
+      const value = `rgb(${r},${g},${b})`;
+      const encoder = new TextEncoder();
+      bleCharacteristic.writeValue(encoder.encode(value)).catch(console.error);
+    }
 
-    colorWheel.on("color:change", function(color) {
-      updatePreview(color);
-    });
+    colorWheel.on("color:change", updatePreviewAndSend);
+    brightnessInput.addEventListener("input", () => updatePreviewAndSend(colorWheel.color));
 
-    brightnessInput.addEventListener("input", function () {
-      updatePreview(colorWheel.color);
+    document.getElementById("connectButton").addEventListener("click", async () => {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "ESP32" }],
+          optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService("12345678-1234-1234-1234-1234567890ab");
+        bleCharacteristic = await service.getCharacteristic("abcdefab-1234-1234-1234-abcdefabcdef");
+
+        document.getElementById("connectionStatus").textContent = "✅ Verbunden mit ESP32";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("connectionStatus").textContent = "❌ Verbindung fehlgeschlagen";
+      }
     });
   </script>
 </body>
