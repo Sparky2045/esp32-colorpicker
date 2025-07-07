@@ -4,77 +4,83 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ESP32 RGB Steuerung</title>
+  <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
   <style>
     body {
-      background: #111;
+      background-color: #111;
       color: #fff;
       font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      text-align: center;
       padding: 2rem;
     }
 
-    h1 {
-      margin-bottom: 1rem;
+    #colorWheel {
+      margin: 2rem auto;
     }
 
-    input[type="color"],
+    #brightnessLabel {
+      margin-top: 2rem;
+    }
+
     input[type="range"] {
-      margin: 1rem;
+      width: 200px;
     }
 
     #preview {
       width: 150px;
       height: 150px;
-      margin-top: 1rem;
+      margin: 2rem auto;
       border-radius: 50%;
-      border: 2px solid #444;
+      border: 2px solid #555;
     }
   </style>
 </head>
 <body>
   <h1>ESP32 RGB Color Picker</h1>
 
-  <label>Farbe wählen:</label>
-  <input type="color" id="colorPicker" value="#ff0000" />
+  <div id="colorWheel"></div>
 
-  <label>Helligkeit:</label>
+  <div id="brightnessLabel">Helligkeit:</div>
   <input type="range" id="brightness" min="0" max="255" value="255" />
 
   <div id="preview"></div>
 
   <script>
-    const colorInput = document.getElementById("colorPicker");
+    const colorWheel = new iro.ColorPicker("#colorWheel", {
+      width: 250,
+      color: "#ff0000",
+      borderWidth: 1,
+      borderColor: "#333",
+    });
+
     const brightnessInput = document.getElementById("brightness");
     const preview = document.getElementById("preview");
-
-    function updatePreview() {
-      const color = colorInput.value;
-      const brightness = brightnessInput.value;
-      const rgb = hexToRgb(color);
-
-      preview.style.backgroundColor = `rgb(${scale(rgb.r, brightness)}, ${scale(rgb.g, brightness)}, ${scale(rgb.b, brightness)})`;
-    }
-
-    function hexToRgb(hex) {
-      const bigint = parseInt(hex.slice(1), 16);
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255,
-      };
-    }
 
     function scale(value, brightness) {
       return Math.round((value / 255) * brightness);
     }
 
-    colorInput.addEventListener("input", updatePreview);
-    brightnessInput.addEventListener("input", updatePreview);
+    function updatePreview(color) {
+      const brightness = brightnessInput.value;
+      const rgb = color.rgb;
 
-    updatePreview();
+      const r = scale(rgb.r, brightness);
+      const g = scale(rgb.g, brightness);
+      const b = scale(rgb.b, brightness);
+
+      preview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Initial Update
+    updatePreview(colorWheel.color);
+
+    colorWheel.on("color:change", function(color) {
+      updatePreview(color);
+    });
+
+    brightnessInput.addEventListener("input", function () {
+      updatePreview(colorWheel.color);
+    });
   </script>
 </body>
 </html>
-
