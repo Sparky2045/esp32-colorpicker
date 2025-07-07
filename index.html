@@ -1,113 +1,85 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ESP32 RGB Color Picker</title>
-  <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 RGB Control</title>
   <style>
     body {
-      background-color: #111;
-      color: white;
       font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-    }
-    #colorPicker {
-      margin: 20px auto;
-    }
-    #preview {
-      width: 120px;
-      height: 120px;
-      margin: 20px auto;
-      border-radius: 50%;
-      border: 2px solid #444;
-    }
-    #brightnessInput {
-      width: 200px;
-    }
-    button {
-      background-color: #333;
+      background: #111;
       color: white;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .color-picker {
       margin-top: 20px;
     }
-    button:hover {
-      background-color: #555;
+    button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 16px;
+      background: #444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
     }
-    #connectionStatus {
-      margin-top: 10px;
+    button:hover {
+      background: #666;
     }
   </style>
 </head>
 <body>
-  <h1>ESP32 RGB Color Picker</h1>
-  <div id="colorPicker"></div>
-  <label for="brightnessInput">Helligkeit:</label><br>
-  <input type="range" id="brightnessInput" min="0" max="255" value="255" /><br>
-  <div id="preview"></div>
-
-  <button id="connectButton">Mit ESP32 verbinden</button>
-  <div id="connectionStatus">❌ Nicht verbunden</div>
+  <h1>ESP32 RGB Bluetooth</h1>
+  <input type="color" id="colorPicker" class="color-picker">
+  <button id="connectBtn">🔵 Bluetooth verbinden</button>
 
   <script>
-    const colorWheel = new iro.ColorPicker("#colorPicker", {
-      width: 280,
-      color: "#ff0000",
-      borderWidth: 1,
-      borderColor: "#555"
-    });
+    const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+    const CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
-    const preview = document.getElementById("preview");
-    const brightnessInput = document.getElementById("brightnessInput");
-    let bleCharacteristic = null;
+    let bleDevice;
+    let bleCharacteristic;
 
-    function scale(value, brightness) {
-      return Math.round((value / 255) * brightness);
-    }
-
-    function updatePreviewAndSend(color) {
-      const brightness = brightnessInput.value;
-      const rgb = color.rgb;
-
-      const r = scale(rgb.r, brightness);
-      const g = scale(rgb.g, brightness);
-      const b = scale(rgb.b, brightness);
-
-      preview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-      sendToESP(r, g, b);
-    }
-
-    function sendToESP(r, g, b) {
-      if (!bleCharacteristic) return;
-      const value = `rgb(${r},${g},${b})`;
-      const encoder = new TextEncoder();
-      bleCharacteristic.writeValue(encoder.encode(value)).catch(console.error);
-    }
-
-    colorWheel.on("color:change", updatePreviewAndSend);
-    brightnessInput.addEventListener("input", () => updatePreviewAndSend(colorWheel.color));
-
-    document.getElementById("connectButton").addEventListener("click", async () => {
+    async function connectBluetooth() {
       try {
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: "ESP32" }],
-          optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }]
         });
-
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService("12345678-1234-1234-1234-1234567890ab");
-        bleCharacteristic = await service.getCharacteristic("abcdefab-1234-1234-1234-abcdefabcdef");
-
-        document.getElementById("connectionStatus").textContent = "✅ Verbunden mit ESP32";
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(6e400001-b5a3-f393-e0a9-e50e24dcca9e);
+        bleCharacteristic = await service.getCharacteristic(6e400002-b5a3-f393-e0a9-e50e24dcca9e);
+        alert("✅ Verbunden mit ESP32");
       } catch (error) {
-        console.error(error);
-        document.getElementById("connectionStatus").textContent = "❌ Verbindung fehlgeschlagen";
+        alert("Fehler bei Verbindung: " + error);
       }
-    });
+    }
+
+    function hexToRgb(hex) {
+      let bigint = parseInt(hex.slice(1), 16);
+      let r = (bigint >> 16) & 255;
+      let g = (bigint >> 8) & 255;
+      let b = bigint & 255;
+      return [r, g, b];
+    }
+
+    async function sendColor(hexColor) {
+      if (!bleCharacteristic) return;
+      const rgb = hexToRgb(hexColor);
+      const data = new Uint8Array(rgb);
+      try {
+        await bleCharacteristic.writeValue(data);
+      } catch (error) {
+        console.log("Fehler beim Senden:", error);
+      }
+    }
+
+    document.getElementById("connectBtn").addEventListener("click", connectBluetooth);
+    document.getElementById("colorPicker").addEventListener("input", e => sendColor(e.target.value));
   </script>
 </body>
 </html>
