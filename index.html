@@ -8,21 +8,23 @@
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
       background: transparent;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100%;
     }
-    #colorPicker {
+    input[type="color"] {
       appearance: none;
+      -webkit-appearance: none;
       border: none;
-      width: 200px;
-      height: 200px;
-      border-radius: 50%;
       padding: 0;
-      outline: none;
+      width: 100%;
+      max-width: 300px;
+      aspect-ratio: 1;
+      border-radius: 50%;
       background: none;
     }
   </style>
@@ -31,37 +33,30 @@
   <input type="color" id="colorPicker" />
 
   <script>
-    const colorPicker = document.getElementById("colorPicker");
+    const cp = document.getElementById("colorPicker");
 
     function hexToRgb(hex) {
-      const bigint = parseInt(hex.slice(1), 16);
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255
-      };
+      const i = parseInt(hex.substring(1), 16);
+      return { r: (i >> 16) & 255, g: (i >> 8) & 255, b: i & 255 };
     }
 
     async function sendColorToESP(rgb) {
       try {
-        const device = await navigator.bluetooth.requestDevice({
+        const dev = await navigator.bluetooth.requestDevice({
           filters: [{ services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }]
         });
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-        const characteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
-
-        const value = `${rgb.r},${rgb.g},${rgb.b}`;
-        const encoder = new TextEncoder();
-        await characteristic.writeValue(encoder.encode(value));
-      } catch (error) {
-        alert("Verbindung fehlgeschlagen: " + error);
+        const srv = await dev.gatt.connect();
+        const svc = await srv.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+        const chr = await svc.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+        const val = `${rgb.r},${rgb.g},${rgb.b}`;
+        await chr.writeValue(new TextEncoder().encode(val));
+      } catch (e) {
+        alert("Fehler: " + e);
       }
     }
 
-    colorPicker.addEventListener("input", () => {
-      const rgb = hexToRgb(colorPicker.value);
-      sendColorToESP(rgb);
+    cp.addEventListener("input", () => {
+      sendColorToESP(hexToRgb(cp.value));
     });
   </script>
 </body>
