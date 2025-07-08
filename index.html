@@ -2,181 +2,66 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>ESP32 RGB Steuerung</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32 Color Picker</title>
   <style>
     body {
-      background: #121212;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
       margin: 0;
-      padding: 0;
+      background: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
     }
-    h1 {
-      margin-top: 20px;
-      font-size: 24px;
-    }
-    #colorWheel {
-      margin: 20px auto;
-      width: 250px;
-      height: 250px;
-    }
-    .slider {
-      width: 80%;
-      margin: 15px auto;
-    }
-    button {
-      margin: 10px;
-      padding: 12px 24px;
-      font-size: 16px;
+    #colorPicker {
       border: none;
-      border-radius: 5px;
-      background: #333;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #555;
-    }
-    .label {
-      margin-top: 10px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      appearance: none;
+      padding: 0;
+      outline: none;
     }
   </style>
 </head>
 <body>
-
-  <h1>ESP32 RGB Steuerung</h1>
-  <canvas id="colorWheel"></canvas>
-  
-  <div class="label">Helligkeit</div>
-  <input type="range" min="0" max="255" value="255" id="brightnessSlider" class="slider">
-  
-  <div class="label">Rainbow Geschwindigkeit (<span id="speedDisplay">100%</span>)</div>
-  <input type="range" min="10" max="200" value="100" id="speedSlider" class="slider">
-
-  <div>
-    <button id="powerButton">LED An/Aus</button>
-    <button id="rainbowButton">🌈 Rainbow</button>
-    <button id="connectButton">🔗 Mit ESP32 verbinden</button>
-  </div>
+  <input type="color" id="colorPicker" />
 
   <script>
-    let bleDevice, bleServer, bleService, bleCharacteristic;
-    let ledOn = true;
-    let rainbow = false;
-    let brightness = 255;
+    const colorPicker = document.getElementById("colorPicker");
 
-    // ✅ Hier deine YuYu UUIDs:
-    const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-    const CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-
-    const canvas = document.getElementById("colorWheel");
-    const ctx = canvas.getContext("2d");
-    canvas.width = canvas.height = 250;
-
-    function drawColorWheel() {
-      const radius = canvas.width / 2;
-      const image = ctx.createImageData(canvas.width, canvas.height);
-      for (let y = -radius; y < radius; y++) {
-        for (let x = -radius; x < radius; x++) {
-          const dx = x / radius;
-          const dy = y / radius;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist > 1) continue;
-
-          const angle = Math.atan2(dy, dx);
-          const hue = (angle * 180 / Math.PI + 360) % 360;
-          const sat = dist;
-          const val = 1;
-
-          const rgb = hsvToRgb(hue / 360, sat, val);
-          const px = ((y + radius) * canvas.width + (x + radius)) * 4;
-          image.data[px] = rgb[0];
-          image.data[px + 1] = rgb[1];
-          image.data[px + 2] = rgb[2];
-          image.data[px + 3] = 255;
-        }
-      }
-      ctx.putImageData(image, 0, 0);
+    function hexToRgb(hex) {
+      const bigint = parseInt(hex.slice(1), 16);
+      return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255
+      };
     }
 
-    function hsvToRgb(h, s, v) {
-      let r, g, b;
-      let i = Math.floor(h * 6);
-      let f = h * 6 - i;
-      let p = v * (1 - s);
-      let q = v * (1 - f * s);
-      let t = v * (1 - (1 - f) * s);
-      switch (i % 6) {
-        case 0: r = v; g = t; b = p; break;
-        case 1: r = q; g = v; b = p; break;
-        case 2: r = p; g = v; b = t; break;
-        case 3: r = p; g = q; b = v; break;
-        case 4: r = t; g = p; b = v; break;
-        case 5: r = v; g = p; b = q; break;
-      }
-      return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-    }
-
-    drawColorWheel();
-
-    canvas.addEventListener("click", async (e) => {
-      if (!ledOn || rainbow) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const imgData = ctx.getImageData(x, y, 1, 1).data;
-      sendColor(imgData[0], imgData[1], imgData[2]);
-    });
-
-    document.getElementById("brightnessSlider").addEventListener("input", e => {
-      brightness = parseInt(e.target.value);
-      if (!rainbow) sendCommand("BRIGHTNESS " + brightness);
-    });
-
-    document.getElementById("speedSlider").addEventListener("input", e => {
-      const val = parseInt(e.target.value);
-      document.getElementById("speedDisplay").innerText = Math.round((val - 10) / 1.9) + "%";
-      if (rainbow) sendCommand("SPEED " + val);
-    });
-
-    document.getElementById("powerButton").addEventListener("click", () => {
-      ledOn = !ledOn;
-      sendCommand(ledOn ? "ON" : "OFF");
-    });
-
-    document.getElementById("rainbowButton").addEventListener("click", () => {
-      rainbow = !rainbow;
-      sendCommand(rainbow ? "RAINBOW_ON" : "RAINBOW_OFF");
-    });
-
-    document.getElementById("connectButton").addEventListener("click", async () => {
+    async function sendColorToESP(rgb) {
       try {
-        bleDevice = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: "Yu" }],
-          optionalServices: [SERVICE_UUID]
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }]
         });
-        bleServer = await bleDevice.gatt.connect();
-        bleService = await bleServer.getPrimaryService(SERVICE_UUID);
-        bleCharacteristic = await bleService.getCharacteristic(CHARACTERISTIC_UUID);
-        alert("Bluetooth verbunden!");
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+        const characteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+
+        const value = `${rgb.r},${rgb.g},${rgb.b}`;
+        const encoder = new TextEncoder();
+        await characteristic.writeValue(encoder.encode(value));
       } catch (error) {
         alert("Verbindung fehlgeschlagen: " + error);
       }
+    }
+
+    colorPicker.addEventListener("input", () => {
+      const rgb = hexToRgb(colorPicker.value);
+      sendColorToESP(rgb);
     });
-
-    function sendCommand(cmd) {
-      if (!bleCharacteristic) return;
-      bleCharacteristic.writeValue(new TextEncoder().encode(cmd));
-    }
-
-    function sendColor(r, g, b) {
-      const scaledR = Math.round(r * (brightness / 255));
-      const scaledG = Math.round(g * (brightness / 255));
-      const scaledB = Math.round(b * (brightness / 255));
-      sendCommand(`COLOR ${scaledR},${scaledG},${scaledB}`);
-    }
   </script>
 </body>
 </html>
