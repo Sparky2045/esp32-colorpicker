@@ -3,25 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ESP32 Color Picker</title>
+  <title>Color Wheel</title>
   <style>
-    body {
+    html, body {
       margin: 0;
-      background: black;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      overflow: hidden;
+      height: 100%;
     }
     #colorPicker {
-      border: none;
-      width: 220px;
-      height: 220px;
-      border-radius: 50%;
       appearance: none;
+      border: none;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
       padding: 0;
       outline: none;
+      background: none;
     }
   </style>
 </head>
@@ -45,7 +47,6 @@
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }]
         });
-
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
         const characteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
